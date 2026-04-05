@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CallHub — Profile</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+<div class="app-wrap">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span class="logo">📞</span><h2>CallHub</h2></div>
+    <div class="sidebar-user glass">
+      <div class="avatar" id="sb-avatar"></div>
+      <div class="sidebar-user-info">
+        <div class="name" id="sb-name"></div>
+        <div class="role" id="sb-role"></div>
+      </div>
+    </div>
+    <div class="nav-section-title">Menu</div>
+    <nav>
+      <a class="nav-item" href="/dashboard"><span class="nav-icon">🏠</span> Home</a>
+      <a class="nav-item" href="#" onclick="goMyProfile()"><span class="nav-icon">👤</span> My Profile</a>
+      <a class="nav-item" href="/page/members"><span class="nav-icon">👥</span> Members</a>
+      <a class="nav-item" href="/page/departments"><span class="nav-icon">🏢</span> Departments</a>
+      <a class="nav-item" id="requests-nav" href="/page/requests" style="display:none"><span class="nav-icon">📝</span> Requests</a>
+      <a class="nav-item" id="analytics-nav" href="/page/analytics" style="display:none"><span class="nav-icon">📊</span> Analytics</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()"><span>🚪</span> Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <a class="btn-back" onclick="history.back()">← Back</a>
+    <div class="profile-wrap">
+      <div class="profile-card glass fade-in">
+
+        <div class="profile-top">
+          <div class="avatar lg" id="profile-avatar"></div>
+          <div class="profile-info">
+            <h2 id="profile-name"></h2>
+            <span class="badge" id="profile-badge"></span>
+          </div>
+        </div>
+
+        <div class="profile-grid">
+          <div class="info-item"><label>Email</label><span id="profile-email"></span></div>
+          <div class="info-item"><label>Phone</label><span id="profile-phone"></span></div>
+          <div class="info-item"><label>Department</label><span id="profile-dept"></span></div>
+          <div class="info-item"><label>Role</label><span id="profile-role"></span></div>
+          <div class="info-item"><label>Join Date</label><span id="profile-join"></span></div>
+          <div class="info-item"><label>At Campus</label><span id="profile-campus"></span></div>
+        </div>
+
+        <!-- Call/Email — shown when viewing someone else -->
+        <div class="contact-btns" id="contact-btns" style="display:none">
+          <button class="btn-call" onclick="logInteraction('CLICK_CALL')">📞 Call</button>
+          <button class="btn-email" onclick="logInteraction('CLICK_EMAIL')">✉️ Email</button>
+        </div>
+
+        <!-- Request Edit — shown only on own profile -->
+        <div id="request-section" style="display:none; margin-top:16px;">
+          <div style="border-top:1px solid var(--glass-border); padding-top:16px;">
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">
+              Want to update your details? Submit a request to the admin.
+            </p>
+            <div id="request-status"></div>
+            <div id="request-form">
+              <div class="form-group">
+                <label>New Name (leave blank to keep current)</label>
+                <input type="text" id="req-name"
+                  style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.06); border:1px solid var(--glass-border); border-radius:10px; color:var(--text); font-family:'Outfit',sans-serif; outline:none;"
+                  placeholder="Enter new name" />
+              </div>
+              <div class="form-group">
+                <label>New Phone (leave blank to keep current)</label>
+                <input type="text" id="req-phone"
+                  style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.06); border:1px solid var(--glass-border); border-radius:10px; color:var(--text); font-family:'Outfit',sans-serif; outline:none;"
+                  placeholder="Enter new phone" />
+              </div>
+              <div class="form-group">
+                <label>At Campus</label>
+                <select id="req-campus"
+                  style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.06); border:1px solid var(--glass-border); border-radius:10px; color:var(--text); font-family:'Outfit',sans-serif; outline:none;">
+                  <option value="">No change</option>
+                  <option value="1">Yes — I am on campus</option>
+                  <option value="0">No — I am off campus</option>
+                </select>
+              </div>
+              <button class="btn-save" style="margin-top:8px;" onclick="submitRequest()">
+                📤 Submit Request
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const token = localStorage.getItem("session_token");
+const myId = localStorage.getItem("member_id");
+const name = localStorage.getItem("member_name");
+const role = localStorage.getItem("role");
+
+if (!token) window.location.href = "/login";
+
+document.getElementById("sb-name").innerText = name;
+document.getElementById("sb-role").innerText = role;
+document.getElementById("sb-avatar").innerText = name ? name[0].toUpperCase() : "?";
+
+const adminRoles = ["Director", "HOD", "Dean", "Admin Staff", "HR Manager"];
+
+if (adminRoles.includes(role)) {
+  document.getElementById("analytics-nav").style.display = "flex";
+  document.getElementById("requests-nav").style.display = "flex";
+}
+
+const targetId = window.location.pathname.split("/").pop();
+
+async function loadProfile() {
+  const res = await fetch(`/members/${targetId}`, { headers: { "Authorization": token } });
+  if (!res.ok) { alert("Member not found!"); history.back(); return; }
+  const m = await res.json();
+
+  document.getElementById("profile-avatar").innerText = m.member_name[0].toUpperCase();
+  document.getElementById("profile-name").innerText = m.member_name;
+  document.getElementById("profile-email").innerText = m.iit_email;
+  document.getElementById("profile-phone").innerText = m.primary_phone;
+  document.getElementById("profile-dept").innerText = m.department_name;
+  document.getElementById("profile-role").innerText = m.role_name;
+  document.getElementById("profile-join").innerText = m.join_date;
+  document.getElementById("profile-campus").innerText = m.is_at_campus ? "✅ On Campus" : "❌ Off Campus";
+
+  const badge = document.getElementById("profile-badge");
+  badge.innerText = m.role_name;
+  badge.className = "badge " + (adminRoles.includes(m.role_name) ? "badge-admin" : "badge-user");
+
+  if (String(targetId) !== String(myId)) {
+    // Viewing someone else — show call/email
+    document.getElementById("contact-btns").style.display = "flex";
+  } else {
+    // Viewing own profile — show request form
+    document.getElementById("request-section").style.display = "block";
+    checkMyRequest();
+  }
+
+  await fetch("/interact", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": token },
+    body: JSON.stringify({ target_member_id: parseInt(targetId), interaction_type: "VIEW_PROFILE" })
+  });
+}
+
+async function logInteraction(type) {
+  await fetch("/interact", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": token },
+    body: JSON.stringify({ target_member_id: parseInt(targetId), interaction_type: type })
+  });
+
+  if (type === "CLICK_CALL") {
+    const phone = document.getElementById("profile-phone").innerText;
+    window.location.href = `tel:${phone}`;
+  } else {
+    const email = document.getElementById("profile-email").innerText;
+    window.location.href = `mailto:${email}`;
+  }
+}
+async function checkMyRequest() {
+  const res = await fetch("/requests/my", { headers: { "Authorization": token } });
+  const data = await res.json();
+  const statusDiv = document.getElementById("request-status");
+  const formDiv = document.getElementById("request-form");
+
+  if (data && data.status === "PENDING") {
+    statusDiv.innerHTML = `<div style="background:rgba(108,99,255,0.15); border:1px solid rgba(108,99,255,0.3); border-radius:10px; padding:12px; margin-bottom:12px; font-size:13px; color:#a29bff;">⏳ You have a pending request submitted on ${data.requested_at}</div>`;
+    formDiv.style.display = "none";
+  } else if (data && data.status === "ACCEPTED") {
+    statusDiv.innerHTML = `<div style="background:rgba(0,214,143,0.12); border:1px solid rgba(0,214,143,0.25); border-radius:10px; padding:12px; margin-bottom:12px; font-size:13px; color:#00d68f;">✅ Your last request was accepted on ${data.reviewed_at}</div>`;
+  } else if (data && data.status === "REJECTED") {
+    statusDiv.innerHTML = `<div style="background:rgba(255,107,107,0.12); border:1px solid rgba(255,107,107,0.25); border-radius:10px; padding:12px; margin-bottom:12px; font-size:13px; color:#ff6b6b;">❌ Your last request was rejected. You can submit a new one.</div>`;
+  }
+}
+
+async function submitRequest() {
+  const reqName = document.getElementById("req-name").value.trim();
+  const phone = document.getElementById("req-phone").value.trim();
+  const campus = document.getElementById("req-campus").value;
+
+  if (!reqName && !phone && !campus) {
+    alert("Please fill at least one field to request a change.");
+    return;
+  }
+
+  const body = {};
+  if (reqName) body.requested_name = reqName;
+  if (phone) body.requested_phone = phone;
+  if (campus !== "") body.requested_campus = campus === "1";
+
+  const res = await fetch("/requests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": token },
+    body: JSON.stringify(body)
+  });
+
+  const data = await res.json();
+  if (res.ok) {
+    alert("✅ Request submitted! An admin will review it shortly.");
+    checkMyRequest();
+  } else {
+    alert("Error: " + data.error);
+  }
+}
+
+function goMyProfile() { window.location.href = `/portfolio/${myId}`; }
+
+async function doLogout() {
+  const loginId = localStorage.getItem("login_id");
+  await fetch("/logout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": token },
+    body: JSON.stringify({ login_id: loginId })
+  });
+  localStorage.clear();
+  window.location.href = "/login";
+}
+
+loadProfile();
+</script>
+</body>
+</html>

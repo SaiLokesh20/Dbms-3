@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CallHub — Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+
+<div class="app-wrap">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="logo">📞</span>
+      <h2>CallHub</h2>
+    </div>
+
+    <div class="sidebar-user glass">
+      <div class="avatar" id="sb-avatar"></div>
+      <div class="sidebar-user-info">
+        <div class="name" id="sb-name"></div>
+        <div class="role" id="sb-role"></div>
+      </div>
+    </div>
+
+    <div class="nav-section-title">Menu</div>
+    <nav>
+      <a class="nav-item active" href="/dashboard">
+        <span class="nav-icon">🏠</span> Home
+      </a>
+      <a class="nav-item" href="#" onclick="goMyProfile()">
+        <span class="nav-icon">👤</span> My Profile
+      </a>
+      <a class="nav-item" href="/page/members">
+        <span class="nav-icon">👥</span> Members
+      </a>
+      <a class="nav-item" href="/page/departments">
+        <span class="nav-icon">🏢</span> Departments
+      </a>
+      <a class="nav-item" id="requests-nav" href="/page/requests" style="display:none"><span class="nav-icon">📝</span> Requests</a>
+      <a class="nav-item" id="analytics-nav" href="/page/analytics" style="display:none">
+        <span class="nav-icon">📊</span> Analytics
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()">
+        <span>🚪</span> Logout
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+
+    <!-- ── ADMIN VIEW ── -->
+    <div id="admin-view" style="display:none">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Good to see you, <span id="admin-name"></span> 👋</div>
+          <div class="page-subtitle">Here's what's happening in your directory today</div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card glass fade-in">
+          <div class="stat-icon">👥</div>
+          <div class="stat-value" id="stat-members">—</div>
+          <div class="stat-label">Total Members</div>
+        </div>
+        <div class="stat-card glass fade-in">
+          <div class="stat-icon">🏢</div>
+          <div class="stat-value" id="stat-depts">—</div>
+          <div class="stat-label">Departments</div>
+        </div>
+        <div class="stat-card glass fade-in">
+          <div class="stat-icon">🔍</div>
+          <div class="stat-value" id="stat-searches">—</div>
+          <div class="stat-label">Total Searches</div>
+        </div>
+        <div class="stat-card glass fade-in">
+          <div class="stat-icon">📋</div>
+          <div class="stat-value" id="stat-audits">—</div>
+          <div class="stat-label">Audit Actions</div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="section-header" style="margin-bottom:12px;">
+        <div class="section-title">Quick Actions</div>
+      </div>
+      <div style="display:flex; gap:12px; margin-bottom:28px;">
+        <button class="btn-accent" onclick="window.location.href='/page/members'">👥 Manage Members</button>
+        <button class="btn-accent" style="background:rgba(108,99,255,0.8);" onclick="window.location.href='/page/departments'">🏢 Departments</button>
+        <button class="btn-accent" style="background:rgba(0,214,143,0.8);" onclick="window.location.href='/page/analytics'">📊 Analytics</button>
+      </div>
+
+      <!-- Recent Audit -->
+      <div class="section-header">
+        <div class="section-title">Recent Activity</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Table</th>
+              <th>Performed By</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="recent-activity"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── USER VIEW ── -->
+    <div id="user-view" style="display:none">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Hello, <span id="user-name"></span> 👋</div>
+          <div class="page-subtitle">Search for anyone on campus</div>
+        </div>
+      </div>
+
+      <!-- Big Search -->
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-big" type="text" id="search-input"
+          placeholder="Search by name or email..." oninput="liveSearch()" autocomplete="off" />
+        <div class="search-dropdown" id="search-dropdown"></div>
+      </div>
+
+      <div class="search-filters">
+        <select class="filter-select" id="filter-dept" onchange="liveSearch()">
+          <option value="">All Departments</option>
+        </select>
+        <select class="filter-select" id="filter-role" onchange="liveSearch()">
+          <option value="">All Roles</option>
+        </select>
+      </div>
+
+      <!-- Recent Contacts -->
+      <div style="margin-top:32px;">
+        <div class="section-header">
+          <div class="section-title">Recent Contacts</div>
+          <button class="clear-btn" onclick="clearRecent()">Clear all</button>
+        </div>
+        <div class="recent-grid" id="recent-list">
+          <div class="no-recent">No recent searches yet — start by searching above</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const token = localStorage.getItem("session_token");
+const name = localStorage.getItem("member_name");
+const role = localStorage.getItem("role");
+const memberId = localStorage.getItem("member_id");
+
+if (!token) window.location.href = "/login";
+
+const adminRoles = ["Director", "HOD", "Dean", "Admin Staff", "HR Manager"];
+const isAdmin = adminRoles.includes(role);
+
+// Set sidebar info
+document.getElementById("sb-name").innerText = name;
+document.getElementById("sb-role").innerText = role;
+document.getElementById("sb-avatar").innerText = name ? name[0].toUpperCase() : "?";
+
+if (isAdmin) {
+  document.getElementById("requests-nav").style.display = "flex";
+  document.getElementById("analytics-nav").style.display = "flex";
+  document.getElementById("admin-view").style.display = "block";
+  document.getElementById("admin-name").innerText = name.split(" ")[0];
+  loadAdminStats();
+  loadRecentActivity();
+} else {
+  document.getElementById("user-view").style.display = "block";
+  document.getElementById("user-name").innerText = name.split(" ")[0];
+  loadFilters();
+  renderRecent();
+}
+
+// ── ADMIN STATS ──────────────────────────────
+async function loadAdminStats() {
+  const res = await fetch("/members?page=1&limit=1", { headers: { "Authorization": token } });
+  const data = await res.json();
+  document.getElementById("stat-members").innerText = data.total || 0;
+
+  const res2 = await fetch("/departments", { headers: { "Authorization": token } });
+  const depts = await res2.json();
+  document.getElementById("stat-depts").innerText = depts.length || 0;
+
+  const res3 = await fetch("/analytics", { headers: { "Authorization": token } });
+  const analytics = await res3.json();
+  const totalSearches = analytics.top_searches.reduce((a, b) => a + b.search_count, 0);
+  document.getElementById("stat-searches").innerText = totalSearches;
+  document.getElementById("stat-audits").innerText = analytics.recent_audits.length;
+}
+
+async function loadRecentActivity() {
+  const res = await fetch("/analytics", { headers: { "Authorization": token } });
+  const data = await res.json();
+  const tbody = document.getElementById("recent-activity");
+
+  if (!data.recent_audits || data.recent_audits.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px;">No activity yet</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = data.recent_audits.map(a => `
+    <tr>
+      <td><span class="badge ${a.action_type === 'DELETE' ? 'badge-admin' : 'badge-user'}">${a.action_type}</span></td>
+      <td>${a.affected_table}</td>
+      <td>${a.performed_by}</td>
+      <td style="color:var(--text-muted)">${a.action_time}</td>
+    </tr>
+  `).join('');
+}
+
+// ── USER SEARCH ───────────────────────────────
+async function loadFilters() {
+  const res = await fetch("/departments", { headers: { "Authorization": token } });
+  const depts = await res.json();
+  const sel = document.getElementById("filter-dept");
+  depts.forEach(d => {
+    const opt = document.createElement("option");
+    opt.value = d.department_id;
+    opt.innerText = d.department_name;
+    sel.appendChild(opt);
+  });
+
+  const res2 = await fetch("/roles", { headers: { "Authorization": token } });
+  const roles = await res2.json();
+  const sel2 = document.getElementById("filter-role");
+  roles.forEach(r => {
+    const opt = document.createElement("option");
+    opt.value = r.role_id;
+    opt.innerText = r.role_name;
+    sel2.appendChild(opt);
+  });
+}
+
+let searchTimer;
+async function liveSearch() {
+  clearTimeout(searchTimer);
+  const keyword = document.getElementById("search-input").value.trim();
+  const dropdown = document.getElementById("search-dropdown");
+
+  if (!keyword) { dropdown.style.display = "none"; return; }
+
+  searchTimer = setTimeout(async () => {
+    const dept = document.getElementById("filter-dept").value;
+    const roleVal = document.getElementById("filter-role").value;
+    const body = { search_keyword: keyword };
+    if (dept) body.filter_department_id = parseInt(dept);
+    if (roleVal) body.filter_role_id = parseInt(roleVal);
+
+    const res = await fetch("/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": token },
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    const results = data.results || [];
+
+    if (results.length === 0) {
+      dropdown.innerHTML = `<div class="no-result">No results found for "${keyword}"</div>`;
+    } else {
+      dropdown.innerHTML = results.map(m => `
+        <div class="drop-item" onclick="openProfile(${m.member_id}, '${m.member_name}', '${m.role_name}', '${m.department_name}')">
+          <div class="drop-avatar">${m.member_name[0]}</div>
+          <div>
+            <div class="drop-name">${m.member_name}</div>
+            <div class="drop-sub">${m.role_name} · ${m.department_name}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+    dropdown.style.display = "block";
+  }, 250);
+}
+
+document.addEventListener("click", e => {
+  if (!document.getElementById("search-input")?.contains(e.target)) {
+    const dd = document.getElementById("search-dropdown");
+    if (dd) dd.style.display = "none";
+  }
+});
+
+function openProfile(id, pName, pRole, dept) {
+  saveRecent(id, pName, pRole, dept);
+  window.location.href = `/portfolio/${id}`;
+}
+
+function saveRecent(id, pName, pRole, dept) {
+  let recent = JSON.parse(localStorage.getItem("recent_contacts") || "[]");
+  recent = recent.filter(r => r.id !== id);
+  recent.unshift({ id, name: pName, role: pRole, dept });
+  if (recent.length > 8) recent = recent.slice(0, 8);
+  localStorage.setItem("recent_contacts", JSON.stringify(recent));
+  renderRecent();
+}
+
+function renderRecent() {
+  const recent = JSON.parse(localStorage.getItem("recent_contacts") || "[]");
+  const list = document.getElementById("recent-list");
+  if (!list) return;
+  if (recent.length === 0) {
+    list.innerHTML = `<div class="no-recent">No recent searches yet — start by searching above</div>`;
+    return;
+  }
+  list.innerHTML = recent.map(r => `
+    <div class="recent-card glass" onclick="window.location.href='/portfolio/${r.id}'">
+      <div class="drop-avatar">${r.name[0]}</div>
+      <div>
+        <div class="recent-name">${r.name}</div>
+        <div class="recent-sub">${r.role} · ${r.dept}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function clearRecent() {
+  localStorage.removeItem("recent_contacts");
+  renderRecent();
+}
+
+function goMyProfile() {
+  window.location.href = `/portfolio/${memberId}`;
+}
+
+async function doLogout() {
+  const loginId = localStorage.getItem("login_id");
+  await fetch("/logout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": token },
+    body: JSON.stringify({ login_id: loginId })
+  });
+  localStorage.clear();
+  window.location.href = "/login";
+}
+</script>
+</body>
+</html>

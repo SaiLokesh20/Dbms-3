@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CallHub — Departments</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+<div class="app-wrap">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span class="logo">📞</span><h2>CallHub</h2></div>
+    <div class="sidebar-user glass">
+      <div class="avatar" id="sb-avatar"></div>
+      <div class="sidebar-user-info"><div class="name" id="sb-name"></div><div class="role" id="sb-role"></div></div>
+    </div>
+    <div class="nav-section-title">Menu</div>
+    <nav>
+      <a class="nav-item" href="/dashboard"><span class="nav-icon">🏠</span> Home</a>
+      <a class="nav-item" href="#" onclick="goMyProfile()"><span class="nav-icon">👤</span> My Profile</a>
+      <a class="nav-item" href="/page/members"><span class="nav-icon">👥</span> Members</a>
+      <a class="nav-item active" href="/page/departments"><span class="nav-icon">🏢</span> Departments</a>
+      <a class="nav-item" id="requests-nav" href="/page/requests" style="display:none"><span class="nav-icon">📝</span> Requests</a>
+      <a class="nav-item" id="analytics-nav" href="/page/analytics" style="display:none"><span class="nav-icon">📊</span> Analytics</a>
+    </nav>
+    <div class="sidebar-footer"><button class="logout-btn" onclick="doLogout()"><span>🚪</span> Logout</button></div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">🏢 <span>Departments</span></div>
+        <div class="page-subtitle">All departments in the institution</div>
+      </div>
+      <button class="btn-accent" id="add-btn" style="display:none" onclick="openModal('add-modal')">+ Add Department</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Department</th><th>Building</th><th>Hours</th><th>HOD</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="dept-table"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <h3>Add Department</h3>
+    <div class="form-group"><label>Name</label><input type="text" id="add-name" /></div>
+    <div class="form-group"><label>Building</label><input type="text" id="add-building" /></div>
+    <div class="form-group"><label>Opening Hours</label><input type="time" id="add-open" /></div>
+    <div class="form-group"><label>Closing Hours</label><input type="time" id="add-close" /></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('add-modal')">Cancel</button>
+      <button class="btn-save" onclick="addDept()">Add</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <h3>Edit Department</h3>
+    <input type="hidden" id="edit-id" />
+    <div class="form-group"><label>Name</label><input type="text" id="edit-name" /></div>
+    <div class="form-group"><label>Building</label><input type="text" id="edit-building" /></div>
+    <div class="form-group"><label>Opening Hours</label><input type="time" id="edit-open" /></div>
+    <div class="form-group"><label>Closing Hours</label><input type="time" id="edit-close" /></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('edit-modal')">Cancel</button>
+      <button class="btn-save" onclick="updateDept()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const token = localStorage.getItem("session_token");
+const role = localStorage.getItem("role");
+const name = localStorage.getItem("member_name");
+const memberId = localStorage.getItem("member_id");
+if (!token) window.location.href = "/login";
+document.getElementById("sb-name").innerText = name;
+document.getElementById("sb-role").innerText = role;
+document.getElementById("sb-avatar").innerText = name ? name[0].toUpperCase() : "?";
+const adminRoles = ["Director", "HOD", "Dean", "Admin Staff", "HR Manager"];
+const isAdmin = adminRoles.includes(role);
+if (isAdmin) { document.getElementById("add-btn").style.display = "flex"; document.getElementById("analytics-nav").style.display = "flex"; document.getElementById("requests-nav").style.display = "flex";}
+
+async function loadDepts() {
+  const res = await fetch("/departments", { headers: { "Authorization": token } });
+  const depts = await res.json();
+  const tbody = document.getElementById("dept-table");
+  if (depts.length === 0) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No departments</td></tr>`; return; }
+  tbody.innerHTML = depts.map(d => `
+    <tr>
+      <td><strong>${d.department_name}</strong></td>
+      <td style="color:var(--text-muted)">${d.building}</td>
+      <td style="color:var(--text-muted)">${d.opening_hours} — ${d.closing_hours}</td>
+      <td>${d.hod_name || '—'}</td>
+      <td>
+        ${isAdmin ? `<button class="btn-sm btn-edit" onclick="openEditModal(${d.department_id},'${d.department_name}','${d.building}','${d.opening_hours}','${d.closing_hours}')">Edit</button>` : '—'}
+        ${isAdmin ? `<button class="btn-sm btn-delete" onclick="deleteDept(${d.department_id})">Delete</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openModal(id) { document.getElementById(id).classList.add("active"); }
+function closeModal(id) { document.getElementById(id).classList.remove("active"); }
+
+async function addDept() {
+  const data = { department_name: document.getElementById("add-name").value, building: document.getElementById("add-building").value, opening_hours: document.getElementById("add-open").value, closing_hours: document.getElementById("add-close").value };
+  const res = await fetch("/departments", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": token }, body: JSON.stringify(data) });
+  const result = await res.json();
+  if (res.ok) { closeModal("add-modal"); loadDepts(); alert("Department added!"); }
+  else alert("Error: " + result.error);
+}
+
+function openEditModal(id, dName, building, open, close) {
+  document.getElementById("edit-id").value = id;
+  document.getElementById("edit-name").value = dName;
+  document.getElementById("edit-building").value = building;
+  document.getElementById("edit-open").value = open;
+  document.getElementById("edit-close").value = close;
+  openModal("edit-modal");
+}
+
+async function updateDept() {
+  const id = document.getElementById("edit-id").value;
+  const data = { department_name: document.getElementById("edit-name").value, building: document.getElementById("edit-building").value, opening_hours: document.getElementById("edit-open").value, closing_hours: document.getElementById("edit-close").value };
+  const res = await fetch(`/departments/${id}`, { method: "PUT", headers: { "Content-Type": "application/json", "Authorization": token }, body: JSON.stringify(data) });
+  const result = await res.json();
+  if (res.ok) { closeModal("edit-modal"); loadDepts(); alert("Updated!"); }
+  else alert("Error: " + result.error);
+}
+
+async function deleteDept(id) {
+  if (!confirm("Delete this department?")) return;
+  const res = await fetch(`/departments/${id}`, { method: "DELETE", headers: { "Authorization": token } });
+  const result = await res.json();
+  if (res.ok) { loadDepts(); alert("Deleted!"); }
+  else alert("Error: " + result.error);
+}
+
+function goMyProfile() { window.location.href = `/portfolio/${memberId}`; }
+async function doLogout() {
+  const loginId = localStorage.getItem("login_id");
+  await fetch("/logout", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": token }, body: JSON.stringify({ login_id: loginId }) });
+  localStorage.clear(); window.location.href = "/login";
+}
+loadDepts();
+</script>
+</body>
+</html>

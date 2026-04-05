@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CallHub — Members</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+
+<div class="app-wrap">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="logo">📞</span>
+      <h2>CallHub</h2>
+    </div>
+    <div class="sidebar-user glass">
+      <div class="avatar" id="sb-avatar"></div>
+      <div class="sidebar-user-info">
+        <div class="name" id="sb-name"></div>
+        <div class="role" id="sb-role"></div>
+      </div>
+    </div>
+    <div class="nav-section-title">Menu</div>
+    <nav>
+      <a class="nav-item" href="/dashboard"><span class="nav-icon">🏠</span> Home</a>
+      <a class="nav-item" href="#" onclick="goMyProfile()"><span class="nav-icon">👤</span> My Profile</a>
+      <a class="nav-item active" href="/page/members"><span class="nav-icon">👥</span> Members</a>
+      <a class="nav-item" href="/page/departments"><span class="nav-icon">🏢</span> Departments</a>
+      <a class="nav-item" id="requests-nav" href="/page/requests" style="display:none"><span class="nav-icon">📝</span> Requests</a>
+      <a class="nav-item" id="analytics-nav" href="/page/analytics" style="display:none"><span class="nav-icon">📊</span> Analytics</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()"><span>🚪</span> Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">👥 <span>Members</span></div>
+        <div class="page-subtitle">View and manage all campus members</div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn-accent" id="add-btn" style="display:none" onclick="openModal('add-modal')">+ Add Member</button>
+        <button class="btn-accent" id="bulk-btn" style="display:none; background:rgba(0,214,143,0.7);" onclick="document.getElementById('csv-input').click()">📂 Bulk Upload</button>
+        <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="bulkUpload(this)" />
+      </div>
+    </div>
+
+    <div class="search-row">
+      <input class="search-input" type="text" id="search-input" placeholder="Search by name or email..." oninput="searchMembers()" />
+      <select class="filter-sm" id="filter-dept" onchange="searchMembers()">
+        <option value="">All Departments</option>
+      </select>
+      <select class="filter-sm" id="filter-role" onchange="searchMembers()">
+        <option value="">All Roles</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Email</th>
+            <th>Department</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="members-table"></tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="pagination-wrap" style="display:none">
+      <span id="page-info"></span>
+      <div class="page-btns">
+        <button class="page-btn" id="prev-btn" onclick="changePage(-1)">← Prev</button>
+        <button class="page-btn" id="next-btn" onclick="changePage(1)">Next →</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <h3>Add New Member</h3>
+    <div class="form-group"><label>Full Name</label><input type="text" id="add-name" /></div>
+    <div class="form-group"><label>Email</label><input type="email" id="add-email" /></div>
+    <div class="form-group"><label>Phone (used as password)</label><input type="text" id="add-phone" /></div>
+    <div class="form-group"><label>Date of Birth</label><input type="date" id="add-dob" /></div>
+    <div class="form-group"><label>Join Date</label><input type="date" id="add-joindate" /></div>
+    <div class="form-group"><label>Department</label><select id="add-dept"></select></div>
+    <div class="form-group"><label>Role</label><select id="add-role"></select></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('add-modal')">Cancel</button>
+      <button class="btn-save" onclick="addMember()">Add Member</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <h3>Edit Member</h3>
+    <input type="hidden" id="edit-id" />
+    <div class="form-group"><label>Full Name</label><input type="text" id="edit-name" /></div>
+    <div class="form-group"><label>Phone</label><input type="text" id="edit-phone" /></div>
+    <div class="form-group">
+      <label>At Campus</label>
+      <select id="edit-campus">
+        <option value="1">Yes</option>
+        <option value="0">No</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('edit-modal')">Cancel</button>
+      <button class="btn-save" onclick="updateMember()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const token = localStorage.getItem("session_token");
+const role = localStorage.getItem("role");
+const name = localStorage.getItem("member_name");
+const memberId = localStorage.getItem("member_id");
+
+if (!token) window.location.href = "/login";
+
+document.getElementById("sb-name").innerText = name;
+document.getElementById("sb-role").innerText = role;
+document.getElementById("sb-avatar").innerText = name ? name[0].toUpperCase() : "?";
+
+const adminRoles = ["Director", "HOD", "Dean", "Admin Staff", "HR Manager"];
+const isAdmin = adminRoles.includes(role);
+
+if (isAdmin) {
+  document.getElementById("requests-nav").style.display = "flex";
+  document.getElementById("add-btn").style.display = "flex";
+  document.getElementById("bulk-btn").style.display = "flex";
+  document.getElementById("analytics-nav").style.display = "flex";
+}
+
+let currentPage = 1;
+const limit = 20;
+let totalPages = 1;
+
+async function loadMembers(page = 1) {
+  currentPage = page;
+  const res = await fetch(`/members?page=${page}&limit=${limit}`, { headers: { "Authorization": token } });
+  const data = await res.json();
+  renderTable(data.members || []);
+  totalPages = data.total_pages || 1;
+  updatePagination(data.page, data.total_pages, data.total);
+}
+
+function renderTable(members) {
+  const tbody = document.getElementById("members-table");
+  if (members.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">No members found</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = members.map(m => `
+    <tr>
+      <td>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="avatar" style="width:32px;height:32px;font-size:13px;">${m.member_name[0]}</div>
+          <span>${m.member_name}</span>
+        </div>
+      </td>
+      <td style="color:var(--text-muted)">${m.iit_email}</td>
+      <td>${m.department_name}</td>
+      <td><span class="badge ${adminRoles.includes(m.role_name) ? 'badge-admin' : 'badge-user'}">${m.role_name}</span></td>
+      <td><span class="badge badge-active">Active</span></td>
+      <td>
+        <button class="btn-sm btn-view" onclick="window.location.href='/portfolio/${m.member_id}'">View</button>
+        ${isAdmin ? `<button class="btn-sm btn-edit" onclick="openEditModal(${m.member_id},'${m.member_name}','${m.primary_phone}',${m.is_at_campus})">Edit</button>` : ''}
+        ${isAdmin ? `<button class="btn-sm btn-delete" onclick="deleteMember(${m.member_id})">Delete</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function updatePagination(page, totalPgs, total) {
+  const wrap = document.getElementById("pagination-wrap");
+  wrap.style.display = "flex";
+  document.getElementById("page-info").innerText = `Page ${page} of ${totalPgs} · ${total} members`;
+  document.getElementById("prev-btn").disabled = page <= 1;
+  document.getElementById("next-btn").disabled = page >= totalPgs;
+}
+
+function changePage(dir) {
+  const newPage = currentPage + dir;
+  if (newPage < 1 || newPage > totalPages) return;
+  loadMembers(newPage);
+}
+
+let searchTimer;
+async function searchMembers() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    const keyword = document.getElementById("search-input").value.trim();
+    const dept = document.getElementById("filter-dept").value;
+    const roleVal = document.getElementById("filter-role").value;
+    if (!keyword && !dept && !roleVal) { loadMembers(1); return; }
+    const body = { search_keyword: keyword || " " };
+    if (dept) body.filter_department_id = parseInt(dept);
+    if (roleVal) body.filter_role_id = parseInt(roleVal);
+    const res = await fetch("/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": token },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    renderTable(data.results || []);
+    document.getElementById("pagination-wrap").style.display = "none";
+  }, 300);
+}
+
+async function loadFilters() {
+  const res = await fetch("/departments", { headers: { "Authorization": token } });
+  const depts = await res.json();
+  ["filter-dept", "add-dept"].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    depts.forEach(d => { const o = document.createElement("option"); o.value = d.department_id; o.innerText = d.department_name; sel.appendChild(o); });
+  });
+  const res2 = await fetch("/roles", { headers: { "Authorization": token } });
+  const roles = await res2.json();
+  ["filter-role", "add-role"].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    roles.forEach(r => { const o = document.createElement("option"); o.value = r.role_id; o.innerText = r.role_name; sel.appendChild(o); });
+  });
+}
+
+function openModal(id) { document.getElementById(id).classList.add("active"); }
+function closeModal(id) { document.getElementById(id).classList.remove("active"); }
+
+async function addMember() {
+  const data = {
+    member_name: document.getElementById("add-name").value,
+    iit_email: document.getElementById("add-email").value,
+    primary_phone: document.getElementById("add-phone").value,
+    dob: document.getElementById("add-dob").value,
+    join_date: document.getElementById("add-joindate").value,
+    department_id: parseInt(document.getElementById("add-dept").value),
+    role_id: parseInt(document.getElementById("add-role").value)
+  };
+  const res = await fetch("/members", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": token },
+    body: JSON.stringify(data)
+  });
+  const result = await res.json();
+  if (res.ok) { closeModal("add-modal"); loadMembers(1); alert("Member added!"); }
+  else alert("Error: " + result.error);
+}
+
+function openEditModal(id, mName, phone, campus) {
+  document.getElementById("edit-id").value = id;
+  document.getElementById("edit-name").value = mName;
+  document.getElementById("edit-phone").value = phone;
+  document.getElementById("edit-campus").value = campus ? "1" : "0";
+  openModal("edit-modal");
+}
+
+async function updateMember() {
+  const id = document.getElementById("edit-id").value;
+  const data = {
+    member_name: document.getElementById("edit-name").value,
+    primary_phone: document.getElementById("edit-phone").value,
+    is_at_campus: document.getElementById("edit-campus").value === "1"
+  };
+  const res = await fetch(`/members/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "Authorization": token },
+    body: JSON.stringify(data)
+  });
+  const result = await res.json();
+  if (res.ok) { closeModal("edit-modal"); loadMembers(currentPage); alert("Updated!"); }
+  else alert("Error: " + result.error);
+}
+
+async function deleteMember(id) {
+  if (!confirm("Deactivate this member?")) return;
+  const res = await fetch(`/members/${id}`, { method: "DELETE", headers: { "Authorization": token } });
+  const result = await res.json();
+  if (res.ok) { loadMembers(currentPage); alert("Member deactivated!"); }
+  else alert("Error: " + result.error);
+}
+
+async function bulkUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch("/members/bulk", { method: "POST", headers: { "Authorization": token }, body: formData });
+  const data = await res.json();
+  if (res.ok) { alert(`Done!\nInserted: ${data.success}\nFailed: ${data.failed}`); loadMembers(1); }
+  else alert("Error: " + data.error);
+  input.value = "";
+}
+
+function goMyProfile() { window.location.href = `/portfolio/${memberId}`; }
+
+async function doLogout() {
+  const loginId = localStorage.getItem("login_id");
+  await fetch("/logout", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": token }, body: JSON.stringify({ login_id: loginId }) });
+  localStorage.clear();
+  window.location.href = "/login";
+}
+
+loadFilters();
+loadMembers();
+</script>
+</body>
+</html>

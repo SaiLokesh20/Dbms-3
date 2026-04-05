@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CallHub — Edit Requests</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+<div class="app-wrap">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span class="logo">📞</span><h2>CallHub</h2></div>
+    <div class="sidebar-user glass">
+      <div class="avatar" id="sb-avatar"></div>
+      <div class="sidebar-user-info">
+        <div class="name" id="sb-name"></div>
+        <div class="role" id="sb-role"></div>
+      </div>
+    </div>
+    <div class="nav-section-title">Menu</div>
+    <nav>
+      <a class="nav-item" href="/dashboard"><span class="nav-icon">🏠</span> Home</a>
+      <a class="nav-item" href="#" onclick="goMyProfile()"><span class="nav-icon">👤</span> My Profile</a>
+      <a class="nav-item" href="/page/members"><span class="nav-icon">👥</span> Members</a>
+      <a class="nav-item" href="/page/departments"><span class="nav-icon">🏢</span> Departments</a>
+      <a class="nav-item active" href="/page/requests"><span class="nav-icon">📝</span> Requests</a>
+      <a class="nav-item" href="/page/analytics"><span class="nav-icon">📊</span> Analytics</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()"><span>🚪</span> Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">📝 <span>Edit Requests</span></div>
+        <div class="page-subtitle">Review and manage member edit requests</div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn-accent" onclick="loadRequests('PENDING')" id="btn-pending">Pending</button>
+        <button class="btn-accent" style="background:rgba(0,214,143,0.7)" onclick="loadRequests('ACCEPTED')" id="btn-accepted">Accepted</button>
+        <button class="btn-accent" style="background:rgba(255,107,107,0.7)" onclick="loadRequests('REJECTED')" id="btn-rejected">Rejected</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Email</th>
+            <th>Requested Name</th>
+            <th>Requested Phone</th>
+            <th>Requested Campus</th>
+            <th>Requested At</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="requests-table"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script>
+const token = localStorage.getItem("session_token");
+const role = localStorage.getItem("role");
+const name = localStorage.getItem("member_name");
+const memberId = localStorage.getItem("member_id");
+
+if (!token) window.location.href = "/login";
+
+document.getElementById("sb-name").innerText = name;
+document.getElementById("sb-role").innerText = role;
+document.getElementById("sb-avatar").innerText = name ? name[0].toUpperCase() : "?";
+
+const adminRoles = ["Director", "HOD", "Dean", "Admin Staff", "HR Manager"];
+if (!adminRoles.includes(role)) {
+    alert("Admins only!");
+    window.location.href = "/dashboard";
+}
+
+async function loadRequests(status = "PENDING") {
+    const res = await fetch(`/requests?status=${status}`, {
+        headers: { "Authorization": token }
+    });
+    const data = await res.json();
+    const tbody = document.getElementById("requests-table");
+
+    if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">No ${status.toLowerCase()} requests</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = data.map(r => `
+        <tr>
+            <td>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div class="avatar" style="width:32px;height:32px;font-size:13px;">${r.member_name[0]}</div>
+                    <span>${r.member_name}</span>
+                </div>
+            </td>
+            <td style="color:var(--text-muted)">${r.iit_email}</td>
+            <td>${r.requested_name || '—'}</td>
+            <td>${r.requested_phone || '—'}</td>
+            <td>${r.requested_campus !== null ? (r.requested_campus ? '✅ Yes' : '❌ No') : '—'}</td>
+            <td style="color:var(--text-muted)">${r.requested_at}</td>
+            <td>
+                <span class="badge ${r.status === 'PENDING' ? 'badge-user' : r.status === 'ACCEPTED' ? 'badge-active' : 'badge-admin'}">
+                    ${r.status}
+                </span>
+            </td>
+            <td>
+                ${r.status === 'PENDING' ? `
+                    <button class="btn-sm btn-view" style="background:rgba(0,214,143,0.15);color:#00d68f;" onclick="acceptRequest(${r.request_id})">Accept</button>
+                    <button class="btn-sm btn-delete" onclick="rejectRequest(${r.request_id})">Reject</button>
+                ` : `<span style="color:var(--text-muted); font-size:12px;">Reviewed by ${r.reviewed_by_name || '—'}</span>`}
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function acceptRequest(id) {
+    if (!confirm("Accept this request and apply changes?")) return;
+    const res = await fetch(`/requests/${id}/accept`, {
+        method: "POST",
+        headers: { "Authorization": token }
+    });
+    const data = await res.json();
+    if (res.ok) { alert("✅ Request accepted and changes applied!"); loadRequests("PENDING"); }
+    else alert("Error: " + data.error);
+}
+
+async function rejectRequest(id) {
+    if (!confirm("Reject this request?")) return;
+    const res = await fetch(`/requests/${id}/reject`, {
+        method: "POST",
+        headers: { "Authorization": token }
+    });
+    const data = await res.json();
+    if (res.ok) { alert("❌ Request rejected."); loadRequests("PENDING"); }
+    else alert("Error: " + data.error);
+}
+
+function goMyProfile() { window.location.href = `/portfolio/${memberId}`; }
+
+async function doLogout() {
+    const loginId = localStorage.getItem("login_id");
+    await fetch("/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": token },
+        body: JSON.stringify({ login_id: loginId })
+    });
+    localStorage.clear();
+    window.location.href = "/login";
+}
+
+loadRequests("PENDING");
+</script>
+</body>
+</html>

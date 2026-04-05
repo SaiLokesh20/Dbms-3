@@ -1,0 +1,64 @@
+CallHub Module B - Index Benchmark Results
+==================================================
+Total members benchmarked: 5020
+
+SQL Query Profiling Results (MySQL SHOW PROFILES):
+--------------------------------------------------
+Query: Search members by name with JOINs (LIKE '%test%')
+  Before index avg: 0.01918100s
+  After  index avg: 0.00773400s
+  Improvement     : 59.7%
+
+Python Benchmark Results:
+--------------------------------------------------
+Q1: Search by name with JOINs (LIKE '%test%')
+  Before index avg: 2.6477ms
+  After  index avg: 1.5132ms
+  Improvement     : 42.85%
+
+Q2: Filter by department with JOIN
+  Before index avg: 0.000664s
+  After  index avg: 0.000556s
+  Improvement     : 16.3%
+
+Q3: Search by email
+  Before index avg: 0.003305s
+  After  index avg: 0.003335s
+  Improvement     : -0.9%
+
+EXPLAIN Plans:
+----------------------------------------
+Q1 BEFORE indexes:
+  Member → type: ALL (full table scan) → rows: 4941
+  Member_Role → type: ref → using PRIMARY only
+
+Q1 AFTER indexes:
+  Member → type: ALL → rows: 4941
+  Member_Role → type: ref → using PRIMARY + idx_member_role_mid
+
+Q2 BEFORE indexes:
+  Member → type: ref → using idx_member_dept → rows: 251
+  Member_Role → type: ref → using PRIMARY only
+
+Q2 AFTER indexes:
+  Member → type: ref → using idx_member_dept → rows: 251
+  Member_Role → type: ref → using PRIMARY + idx_member_role_mid
+
+Indexes Applied:
+----------------------------------------
+1. idx_member_name     ON Member(member_name)
+2. idx_member_email    ON Member(iit_email)
+3. idx_member_dept     ON Member(department_id)
+4. idx_member_role_mid ON Member_Role(member_id)
+5. idx_search_time     ON Search_Log(search_time)
+6. idx_interaction_actor  ON Directory_Interaction_Log(actor_member_id)
+7. idx_interaction_target ON Directory_Interaction_Log(target_member_id)
+8. idx_login_member    ON Login_History(member_id)
+9. idx_audit_performed ON Audit_Log(performed_by_member_id)
+
+Summary:
+----------------------------------------
+Best improvement  : 59.7% (MySQL profiling - name search)
+Python benchmark  : 42.85% improvement on Q1
+Department filter : 16.3% improvement on Q2
+Dataset size      : 5020 members

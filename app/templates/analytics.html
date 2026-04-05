@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CallHub — Analytics</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+<div class="app-wrap">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span class="logo">📞</span><h2>CallHub</h2></div>
+    <div class="sidebar-user glass">
+      <div class="avatar" id="sb-avatar"></div>
+      <div class="sidebar-user-info"><div class="name" id="sb-name"></div><div class="role" id="sb-role"></div></div>
+    </div>
+    <div class="nav-section-title">Menu</div>
+    <nav>
+      <a class="nav-item" href="/dashboard"><span class="nav-icon">🏠</span> Home</a>
+      <a class="nav-item" href="#" onclick="goMyProfile()"><span class="nav-icon">👤</span> My Profile</a>
+      <a class="nav-item" href="/page/members"><span class="nav-icon">👥</span> Members</a>
+      <a class="nav-item" href="/page/departments"><span class="nav-icon">🏢</span> Departments</a>
+      <a class="nav-item active" href="/page/analytics"><span class="nav-icon">📊</span> Analytics</a>
+    </nav>
+    <div class="sidebar-footer"><button class="logout-btn" onclick="doLogout()"><span>🚪</span> Logout</button></div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">📊 <span>Analytics</span></div>
+        <div class="page-subtitle">Usage statistics and audit logs</div>
+      </div>
+    </div>
+
+    <div class="analytics-grid">
+      <div class="analytics-box glass">
+        <h3>🔍 Top Searches</h3>
+        <ul id="top-searches"></ul>
+      </div>
+      <div class="analytics-box glass">
+        <h3>🏢 Most Contacted Departments</h3>
+        <ul id="top-departments"></ul>
+      </div>
+      <div class="analytics-box glass">
+        <h3>👤 Most Viewed Profiles</h3>
+        <ul id="top-profiles"></ul>
+      </div>
+      <div class="analytics-box glass">
+        <h3>🔒 Recent Audit Actions</h3>
+        <ul id="recent-audits"></ul>
+      </div>
+    </div>
+
+    <div class="analytics-box glass" style="margin-top:0">
+      <h3>🕐 Login History</h3>
+      <div class="table-wrap" style="margin-top:12px; background:transparent; border:none; box-shadow:none;">
+        <table>
+          <thead>
+            <tr><th>Member</th><th>Email</th><th>Login Time</th><th>Logout Time</th><th>IP</th></tr>
+          </thead>
+          <tbody id="login-history"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const token = localStorage.getItem("session_token");
+const role = localStorage.getItem("role");
+const name = localStorage.getItem("member_name");
+const memberId = localStorage.getItem("member_id");
+if (!token) window.location.href = "/login";
+document.getElementById("sb-name").innerText = name;
+document.getElementById("sb-role").innerText = role;
+document.getElementById("sb-avatar").innerText = name ? name[0].toUpperCase() : "?";
+const adminRoles = ["Director", "HOD", "Dean", "Admin Staff", "HR Manager"];
+if (!adminRoles.includes(role)) { alert("Admins only!"); window.location.href = "/dashboard"; }
+
+async function loadAnalytics() {
+  const res = await fetch("/analytics", { headers: { "Authorization": token } });
+  if (!res.ok) { window.location.href = "/dashboard"; return; }
+  const data = await res.json();
+
+  const noData = `<li style="color:var(--text-muted)">No data yet</li>`;
+
+  document.getElementById("top-searches").innerHTML = data.top_searches.length
+    ? data.top_searches.map(s => `<li>${s.search_keyword}<span>${s.search_count} searches</span></li>`).join('')
+    : noData;
+
+  document.getElementById("top-departments").innerHTML = data.top_departments.length
+    ? data.top_departments.map(d => `<li>${d.department_name}<span>${d.contact_count} contacts</span></li>`).join('')
+    : noData;
+
+  document.getElementById("top-profiles").innerHTML = data.top_profiles.length
+    ? data.top_profiles.map(p => `<li>${p.member_name}<span>${p.view_count} views</span></li>`).join('')
+    : noData;
+
+  document.getElementById("recent-audits").innerHTML = data.recent_audits.length
+    ? data.recent_audits.map(a => `<li>${a.performed_by} → <strong>${a.action_type}</strong> on ${a.affected_table}<span>${a.action_time}</span></li>`).join('')
+    : noData;
+}
+
+async function loadLoginHistory() {
+  const res = await fetch("/login-history", { headers: { "Authorization": token } });
+  const history = await res.json();
+  const tbody = document.getElementById("login-history");
+  if (!history.length) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px;">No login history</td></tr>`; return; }
+  tbody.innerHTML = history.map(h => `
+    <tr>
+      <td>${h.member_name}</td>
+      <td style="color:var(--text-muted)">${h.iit_email}</td>
+      <td>${h.login_time}</td>
+      <td>${h.logout_time || '—'}</td>
+      <td style="color:var(--text-muted)">${h.ip_address}</td>
+    </tr>
+  `).join('');
+}
+
+function goMyProfile() { window.location.href = `/portfolio/${memberId}`; }
+async function doLogout() {
+  const loginId = localStorage.getItem("login_id");
+  await fetch("/logout", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": token }, body: JSON.stringify({ login_id: loginId }) });
+  localStorage.clear(); window.location.href = "/login";
+}
+
+loadAnalytics();
+loadLoginHistory();
+</script>
+</body>
+</html>
